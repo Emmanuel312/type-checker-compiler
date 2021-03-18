@@ -61,6 +61,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
         self.ids_defined[name] = tyype, params, None
         self.inside_what_function = name
         self.visit(ctx.body())
+
         return
 
 
@@ -136,6 +137,8 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#arguments.
     def visitArguments(self, ctx:GrammarParser.ArgumentsContext):
+        for i in range(len(ctx.identifier())):
+            print(ctx.identifier(i).getText())
         return self.visitChildren(ctx)
 
 
