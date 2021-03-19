@@ -48,6 +48,9 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
     ids_defined = {} # Dicionário para armazenar as informações necessárias para cada identifier definido
     inside_what_function = "" # String que guarda a função atual que o visitor está visitando. Útil para acessar dados da função durante a visitação da árvore sintática da função.
 
+    def get_function_definition_by_name(self):
+        return self.ids_defined[self.inside_what_function]
+
     # Visit a parse tree produced by GrammarParser#fiile.
     def visitFiile(self, ctx:GrammarParser.FiileContext):
         return self.visitChildren(ctx)
@@ -58,7 +61,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
         tyype = ctx.tyype().getText()
         name = ctx.identifier().getText()
         params = self.visit(ctx.arguments())
-        self.ids_defined[name] = tyype, params, None
+        self.ids_defined[name] = tyype, params
         self.inside_what_function = name
         self.visit(ctx.body())
 
@@ -67,11 +70,24 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#body.
     def visitBody(self, ctx:GrammarParser.BodyContext):
+        function = self.get_function_definition_by_name()
+        # print(f"começo da funcao {self.inside_what_function}")
+        for i in range(len(ctx.statement())):
+            # print(ctx.statement(i).getText())
+            # throw a non void error
+            return_statement = ctx.statement(i).RETURN()
+            if(return_statement is not None and function[0] == Type.VOID):
+                print(f"ERROR: trying to return a non void expression from void function"
+                      f" 'doing' in line { return_statement.getPayload().line} and "
+                      f"{ return_statement.getPayload().column}")
+
+        # print("fim da funcao")
         return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by GrammarParser#statement.
     def visitStatement(self, ctx:GrammarParser.StatementContext):
+        # print(ctx.if_statement())
         return self.visitChildren(ctx)
 
 
@@ -137,9 +153,13 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#arguments.
     def visitArguments(self, ctx:GrammarParser.ArgumentsContext):
+        params_type = []
         for i in range(len(ctx.identifier())):
-            print(ctx.identifier(i).getText())
-        return self.visitChildren(ctx)
+            # id = ctx.identifier(i).getText()
+            tyype = ctx.tyype(i).getText()
+            # self.ids_defined[id] = tyype
+            params_type.append(tyype)
+        return params_type
 
 
     # Visit a parse tree produced by GrammarParser#tyype.
