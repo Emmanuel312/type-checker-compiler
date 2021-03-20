@@ -80,11 +80,29 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
         self.visit(ctx.body())
 
     # Visit a parse tree produced by GrammarParser#body.
+<<<<<<< HEAD
     def visitBody(self, ctx: GrammarParser.BodyContext):
         function_return_type = self.get_current_function_definition()[0]
+=======
+    def visitBody(self, ctx:GrammarParser.BodyContext):
+        function = self.get_function_definition_by_name()
+        # print(function)
+        # print(f"começo da funcao {self.inside_what_function}")
+>>>>>>> 08f91a9 (trying to return void expression)
         for i in range(len(ctx.statement())):
             # throw a non void error
             return_statement = ctx.statement(i).RETURN()
+<<<<<<< HEAD
+=======
+            if(return_statement is not None and function[0] == Type.VOID):
+                print(f"ERROR: trying to return a non void expression from void function"
+                      f" '{self.inside_what_function}' in line { return_statement.getPayload().line} and column "
+                      f"{ return_statement.getPayload().column}")
+            if(return_statement is not None and function[0] == Type.INT and function[1] == []):
+                print(f"ERROR: trying to return void expression from function"
+                      f" '{self.inside_what_function}' in line { return_statement.getPayload().line} and column "
+                      f"{ return_statement.getPayload().column}")
+>>>>>>> 08f91a9 (trying to return void expression)
 
             if return_statement:
                 # current_return_statement_type = self.visit(ctx.statement(i))
