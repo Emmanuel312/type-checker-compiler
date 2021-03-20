@@ -48,7 +48,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
     ids_defined = {} # Dicionário para armazenar as informações necessárias para cada identifier definido
     inside_what_function = "" # String que guarda a função atual que o visitor está visitando. Útil para acessar dados da função durante a visitação da árvore sintática da função.
 
-    def get_function_definition_by_name(self):
+    def get_current_function_definition(self):
         return self.ids_defined[self.inside_what_function]
 
     # Visit a parse tree produced by GrammarParser#fiile.
@@ -70,7 +70,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#body.
     def visitBody(self, ctx:GrammarParser.BodyContext):
-        function = self.get_function_definition_by_name()
+        function = self.get_current_function_definition()
         # print(f"começo da funcao {self.inside_what_function}")
         for i in range(len(ctx.statement())):
             # print(ctx.statement(i).getText())
@@ -123,6 +123,40 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#variable_definition.
     def visitVariable_definition(self, ctx:GrammarParser.Variable_definitionContext):
+        variable_tyype = ctx.tyype().getText()
+        # print(variable_tyype)
+
+        for i in range(len(ctx.identifier())):
+            # get attributes
+            id = ctx.identifier(i)
+            name = id.getText()
+            line = id.IDENTIFIER().getPayload().line
+            column = id.IDENTIFIER().getPayload().column
+
+            self.ids_defined[name] = variable_tyype
+            current_expression = ctx.expression(i)
+
+
+            if current_expression.string():
+                # throw a assign char * expression error
+                if variable_tyype in [Type.INT, Type.FLOAT]:
+                    print(f"ERROR: trying to assign 'char *' expression to variable "
+                          f"'{name}' in line {line} and column {column}")
+
+            elif current_expression.floating():
+                # throw a possible loss of information warning
+                if variable_tyype == Type.INT:
+                    print(f"WARNING: possible loss of information assigning float expression to int variable "
+                          f"'{name}' in line {line} and column {column}")
+
+            # variable definition with void or another type
+            elif current_expression.function_call():
+                function_type = self.visit(ctx.expression(i))
+                if function_type == Type.VOID:
+                    print(f"ERROR: trying to assign 'void' expression to variable {name} in line {line} and column {column}")
+
+
+
         return self.visitChildren(ctx)
 
 
@@ -133,7 +167,25 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#expression.
     def visitExpression(self, ctx:GrammarParser.ExpressionContext):
-        return self.visitChildren(ctx)
+        # should returns the type by stmt
+        if ctx.function_call():
+            function_name = ctx.function_call().identifier().IDENTIFIER().getText()
+            function_type = self.ids_defined[function_name][0]
+            return function_type
+
+        elif ctx.integer():
+            return Type.INT
+
+        elif ctx.floating():
+            return Type.FLOAT
+
+        elif ctx.string():
+            return Type.STRING
+
+        # elif ctx.expression():
+        #     self.visitExpression(ctx.expression())
+
+        self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by GrammarParser#array.
