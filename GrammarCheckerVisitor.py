@@ -71,6 +71,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
     # Visit a parse tree produced by GrammarParser#body.
     def visitBody(self, ctx:GrammarParser.BodyContext):
         function = self.get_function_definition_by_name()
+        # print(function)
         # print(f"começo da funcao {self.inside_what_function}")
         for i in range(len(ctx.statement())):
             # print(ctx.statement(i).getText())
@@ -78,7 +79,11 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             return_statement = ctx.statement(i).RETURN()
             if(return_statement is not None and function[0] == Type.VOID):
                 print(f"ERROR: trying to return a non void expression from void function"
-                      f" 'doing' in line { return_statement.getPayload().line} and "
+                      f" '{self.inside_what_function}' in line { return_statement.getPayload().line} and column "
+                      f"{ return_statement.getPayload().column}")
+            if(return_statement is not None and function[0] == Type.INT and function[1] == []):
+                print(f"ERROR: trying to return void expression from function"
+                      f" '{self.inside_what_function}' in line { return_statement.getPayload().line} and column "
                       f"{ return_statement.getPayload().column}")
 
         # print("fim da funcao")
