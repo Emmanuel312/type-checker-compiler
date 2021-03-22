@@ -149,11 +149,33 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
     def visitVariable_assignment(self, ctx: GrammarParser.Variable_assignmentContext):
         variable_name = ctx.identifier().getText()
         token = ctx.identifier().IDENTIFIER().getPayload()
+
         if not self.ids_defined.get(variable_name, None):
             print(f"ERROR: undefined variable '{variable_name}' in line {token.line} and column {token.column}")
 
+        if ctx.expression():
+            expr_type = self.visitExpression(ctx.expression())
+            text = None
 
-        return self.visitChildren(ctx)
+            if ctx.identifier():
+                token = ctx.identifier().IDENTIFIER().getPayload()
+                text = ctx.identifier().getText()
+                id_type = self.ids_defined.get(text, Type.VOID)
+
+            else:
+                token = ctx.array().identifier().IDENTIFIER().getPayload()
+                text = ctx.array().identifier().getText()
+                id_type = self.ids_defined.get(text, Type.VOID)
+
+            # Check the types of the variable that is receiving the assignment and the value being assigned.
+            # if not (id_type == expr_type or (id_type == Type.INT and expr_type == Type.FLOAT)):
+            #     print("[ERROR]::[Oh. My. God. You just tried to assign <{}> to <{}>. Wow.] ({},{})".format(expr_type,
+            #                                                                                                id_type, str(
+            #             token.line), str(token.column)))
+            if id_type == Type.INT and expr_type == Type.FLOAT:
+                print(f"WARNING: possible loss of information assigning float expression to int variable "
+                      f"'{text}' in line {token.line} and column {token.column}")
+            return self.visitChildren(ctx)
 
     # Visit a parse tree produced by GrammarParser#expression.
     def visitExpression(self, ctx: GrammarParser.ExpressionContext):
