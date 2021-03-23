@@ -147,11 +147,12 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#variable_assignment.
     def visitVariable_assignment(self, ctx: GrammarParser.Variable_assignmentContext):
-        variable_name = ctx.identifier().getText()
-        token = ctx.identifier().IDENTIFIER().getPayload()
+        if ctx.identifier():
+            variable_name = ctx.identifier().getText()
+            token = ctx.identifier().IDENTIFIER().getPayload()
 
-        if not self.ids_defined.get(variable_name, None):
-            print(f"ERROR: undefined variable '{variable_name}' in line {token.line} and column {token.column}")
+            if not self.ids_defined.get(variable_name, None):
+                print(f"ERROR: undefined variable '{variable_name}' in line {token.line} and column {token.column}")
 
         if ctx.expression():
             expr_type = self.visitExpression(ctx.expression())
@@ -205,8 +206,28 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 tyype = self.ids_defined.get(text, Type.VOID)
 
             elif ctx.function_call():
+                token = ctx.function_call().identifier().IDENTIFIER().getPayload()
                 function_name = ctx.function_call().identifier().IDENTIFIER().getText()
                 function_type = self.ids_defined[function_name][0]
+                defined_function_params = self.ids_defined[function_name][1]
+                called_function_params = self.visit(ctx.function_call())
+
+                if len(defined_function_params) != len(called_function_params):
+                    print(f"ERROR: incorrect number of parameters for function '{function_name}' in "
+                          f"line {token.line} and column {token.column}. Expecting {len(defined_function_params)}, "
+                          f"but {len(called_function_params)} were given")
+
+                # check possible loss of information param by param
+                param_index = 0
+                for defined_function_param, called_function_param in zip(defined_function_params, called_function_params):
+                    if called_function_param == Type.FLOAT and defined_function_param == Type.INT:
+                        print(f"WARNING: possible loss of information converting float expression to "
+                              f"int expression in parameter {param_index} of function '{function_name}' "
+                              f"in line {token.line} and column {token.column}")
+                    param_index += 1
+
+
+
                 tyype = function_type
 
         elif len(ctx.expression()) == 1:
@@ -241,7 +262,12 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#function_call.
     def visitFunction_call(self, ctx: GrammarParser.Function_callContext):
-        return self.visitChildren(ctx)
+        params_type = []
+        for i in range(len(ctx.expression())):
+            param_type = self.visit(ctx.expression(i))
+            params_type.append(param_type)
+
+        return params_type
 
     # Visit a parse tree produced by GrammarParser#arguments.
     def visitArguments(self, ctx: GrammarParser.ArgumentsContext):
