@@ -165,7 +165,10 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                         self.add_to_messages(token.line, token.column,
                                              f"WARNING: possible loss of information assigning float expression to int "
                                              f"variable '{text}' in line {token.line} and column {token.column}")
-
+                    elif expr_type == Type.STRING:
+                        self.add_to_messages(token.line, token.column,
+                                             f"ERROR: trying to assign 'char *' expression to variable '{text}' in "
+                                             f"line {token.line} and column {token.column}")
                     else:
                         self.add_to_messages(token.line, token.column,
                                              f"ERROR: trying to assign 'void' expression to variable '{text}' in "
