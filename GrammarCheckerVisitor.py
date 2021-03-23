@@ -170,6 +170,22 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                         self.add_to_messages(token.line, token.column,
                                              f"ERROR: trying to assign 'void' expression to variable '{text}' in "
                                              f"line {token.line} and column {token.column}")
+        
+        for i in range(len(ctx.array())):
+                text = ctx.array(i).identifier().getText()
+                token = ctx.array(i).identifier().IDENTIFIER().getPayload()
+                tyype = ctx.tyype().getText()
+                if self.visit(ctx.array(i).expression()) == Type.INT:
+                    self.ids_defined[text] = tyype, None
+                if ctx.array_literal(i) is not None:
+                    for index in range(len(ctx.array_literal(i).expression())):
+                        arrlit_type = self.visit(ctx.array_literal(i).expression(index))
+                        if arrlit_type == Type.FLOAT and tyype == Type.INT:
+                            self.add_to_messages(token.line, token.column,
+                                                 f"WARNING: possible loss of information initializing float expression to int array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
+                        elif arrlit_type == Type.STRING and (tyype == Type.INT or tyype == Type.FLOAT):
+                            self.add_to_messages(token.line, token.column, 
+                                                 f"ERROR: trying to initialize 'char *' expression to '{tyype}' array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
 
         return self.visitChildren(ctx)
 
@@ -234,6 +250,10 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 text = ctx.array().identifier().getText()
                 token = ctx.array().identifier().IDENTIFIER().getPayload()
                 tyype = self.ids_defined.get(text, Type.VOID)
+                if text in self.ids_defined.keys():
+                    tyype = self.ids_defined[text][0]
+                else:
+                    self.add_to_messages(token.line, token.column, f"ERROR: undefined array '{text}' in line {token.line} and column {token.column}")
 
             elif ctx.function_call():
                 function_type = self.visit(ctx.function_call())
