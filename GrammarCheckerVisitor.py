@@ -93,7 +93,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                     column = return_statement.getPayload().column
                     self.add_to_messages(line, column, f"ERROR: trying to return a non void expression "
                                                        f"from void function"
-                                                       f" '{self.inside_what_function}' in line {line} and "
+                                                       f" '{self.inside_what_function}' in line {line} and column "
                                                        f"{column}")
 
 
@@ -113,9 +113,9 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             column = ctx.RETURN().getPayload().column
 
             if return_type_expression == Type.VOID and function_return_type != Type.VOID:
-                self.add_to_messages(line, column, f"ERROR: trying to return a void expression "
+                self.add_to_messages(line, column, f"ERROR: trying to return void expression "
                                                    f"from function"
-                                                   f" '{self.inside_what_function}' in line {line} and "
+                                                   f" '{self.inside_what_function}' in line {line} and column "
                                                    f"{column}")
 
 
