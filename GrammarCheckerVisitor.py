@@ -89,14 +89,9 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             if return_statement:
                 # current_return_statement_type = self.visit(ctx.statement(i))
                 if function_return_type == Type.VOID:
-                    line = return_statement.getPayload().line
-                    column = return_statement.getPayload().column
-                    self.add_to_messages(line, column, f"ERROR: trying to return a non void expression "
-                                                       f"from void function"
-                                                       f" '{self.inside_what_function}' in line {line} and "
-                                                       f"{column}")
-
-
+                    print(f"ERROR: trying to return a non void expression from void function"
+                        f" '{self.inside_what_function}' in line {return_statement.getPayload().line} and "
+                        f"{return_statement.getPayload().column}")
                 # function with return a diferent type
                 # if function_return_type !=
 
@@ -167,9 +162,22 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                                              f"variable '{text}' in line {token.line} and column {token.column}")
 
                     else:
-                        self.add_to_messages(token.line, token.column,
-                                             f"ERROR: trying to assign 'void' expression to variable '{text}' in "
-                                             f"line {token.line} and column {token.column}")
+                       print(f"ERROR: trying to assign 'void' expression to variable '{text}' in "
+                             f"line {token.line} and column {token.column}")
+        
+        for i in range(len(ctx.array())):
+                text = ctx.array(i).identifier().getText()
+                token = ctx.array(i).identifier().IDENTIFIER().getPayload()
+                tyype = ctx.tyype().getText()
+                if self.visit(ctx.array(i).expression()) == Type.INT:
+                    self.ids_defined[text] = tyype, None
+                if ctx.array_literal(i) is not None:
+                    for index in range(len(ctx.array_literal(i).expression())):
+                        arrlit_type = self.visit(ctx.array_literal(i).expression(index))
+                        if arrlit_type == Type.FLOAT and tyype == Type.INT:
+                            print(f"WARNING: possible loss of information initializing float expression to int array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
+                        elif arrlit_type == Type.STRING and (tyype == Type.INT or tyype == Type.FLOAT):
+                            print(f"ERROR: trying to initialize 'char *' expression to '{tyype}' array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
 
         return self.visitChildren(ctx)
 
@@ -233,7 +241,11 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             elif ctx.array():
                 text = ctx.array().identifier().getText()
                 token = ctx.array().identifier().IDENTIFIER().getPayload()
-                tyype = self.ids_defined.get(text, Type.VOID)
+                tyype = None
+                if text in self.ids_defined.keys():
+                    tyype = self.ids_defined[text][0]
+                else:
+                    print(f"ERROR: undefined array '{text}' in line {token.line} and column {token.column}")
 
             elif ctx.function_call():
                 function_type = self.visit(ctx.function_call())
@@ -260,6 +272,10 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by GrammarParser#array.
     def visitArray(self, ctx: GrammarParser.ArrayContext):
+        tyype = self.visit(ctx.expression())
+        if tyype != Type.INT:
+            token = ctx.identifier().IDENTIFIER().getPayload()
+            print(f"ERROR: array expression must be an integer, but it is {tyype} in line {token.line} and column {token.column}")
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by GrammarParser#array_literal.
