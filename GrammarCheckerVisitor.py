@@ -211,6 +211,9 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 token = ctx.identifier().IDENTIFIER().getPayload()
                 text = ctx.identifier().getText()
                 id_type = self.ids_defined.get(text, Type.VOID)
+                if(expr_type == Type.STRING and (id_type == Type.INT or id_type == Type.FLOAT)):
+                    self.add_to_messages(token.line, token.column,
+                                         f"ERROR: trying to assign 'char *' expression to variable '{text}' in line {token.line} and column {token.column}")
 
             else:
                 token = ctx.array().identifier().IDENTIFIER().getPayload()
