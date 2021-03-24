@@ -248,6 +248,8 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                                          f"expression to int variable "
                                          f"'{text}' in line {token.line} and column {token.column}"
                                          )
+            elif ctx.expression().function_call():
+                self.visit(ctx.expression().function_call())
 
             return self.visitChildren(ctx)
 
@@ -307,6 +309,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                                              )
             # always returns float if exists
             tyype = Type.FLOAT if Type.FLOAT in [left, right] else right
+
         return tyype
 
     # Visit a parse tree produced by GrammarParser#array.
@@ -341,6 +344,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             called_function_param = self.visit(ctx.expression(i))
             called_function_params.append(called_function_param)
 
+
         # throw a error if the amount of params are not equal
         if len(defined_function_params) != len(called_function_params):
             self.add_to_messages(token.line, token.column,
@@ -352,6 +356,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
         # check possible loss of information param by param
         param_index = 0
+
         for defined_function_param, called_function_param in zip(defined_function_params, called_function_params):
             if called_function_param == Type.FLOAT and defined_function_param == Type.INT:
                 self.add_to_messages(token.line, token.column,
