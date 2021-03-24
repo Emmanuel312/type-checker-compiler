@@ -54,12 +54,17 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
     # utils
     def add_to_messages(self, line, column, message):
-        key = f"{line},{column}"
+        key = f"{line},{column},{message}"
         self.dict_with_erros_and_warnings_message[key] = message
 
     def print_messages(self):
-        for i in self.dict_with_erros_and_warnings_message.values():
-            print(i)
+        messages = sorted(self.dict_with_erros_and_warnings_message,
+                          key=lambda key: (int(key.split(',')[0]), int(key.split(',')[1])))
+
+        for i in messages:
+            print(self.dict_with_erros_and_warnings_message[i])
+
+
 
     def get_current_function_definition(self):
         return self.ids_defined[self.inside_what_function]
@@ -87,10 +92,11 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
             return_statement = ctx.statement(i).RETURN()
 
             if return_statement:
-                # current_return_statement_type = self.visit(ctx.statement(i))
+                current_return_statement_type = self.visit(ctx.statement(i).expression())
+                line = return_statement.getPayload().line
+                column = return_statement.getPayload().column
+
                 if function_return_type == Type.VOID:
-                    line = return_statement.getPayload().line
-                    column = return_statement.getPayload().column
                     self.add_to_messages(line, column, f"ERROR: trying to return a non void expression "
                                                        f"from void function"
                                                        f" '{self.inside_what_function}' in line {line} and column "
@@ -98,7 +104,12 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
 
 
                 # function with return a diferent type
-                # if function_return_type !=
+                elif function_return_type != current_return_statement_type:
+                    if function_return_type == Type.INT and current_return_statement_type == Type.FLOAT:
+                        self.add_to_messages(line, column,
+                                             f"WARNING: possible loss of information returning float expression from "
+                                             f"int function '{self.inside_what_function}' "
+                                             f"in line {line} and column {column}")
 
         return self.visitChildren(ctx)
 
@@ -117,8 +128,6 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                                                    f"from function"
                                                    f" '{self.inside_what_function}' in line {line} and column "
                                                    f"{column}")
-
-
 
     # Visit a parse tree produced by GrammarParser#if_statement.
     def visitIf_statement(self, ctx: GrammarParser.If_statementContext):
@@ -173,22 +182,22 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                         self.add_to_messages(token.line, token.column,
                                              f"ERROR: trying to assign 'void' expression to variable '{text}' in "
                                              f"line {token.line} and column {token.column}")
-        
+
         for i in range(len(ctx.array())):
-                text = ctx.array(i).identifier().getText()
-                token = ctx.array(i).identifier().IDENTIFIER().getPayload()
-                tyype = ctx.tyype().getText()
-                if self.visit(ctx.array(i).expression()) == Type.INT:
-                    self.ids_defined[text] = tyype, None
-                if ctx.array_literal(i) is not None:
-                    for index in range(len(ctx.array_literal(i).expression())):
-                        arrlit_type = self.visit(ctx.array_literal(i).expression(index))
-                        if arrlit_type == Type.FLOAT and tyype == Type.INT:
-                            self.add_to_messages(token.line, token.column,
-                                                 f"WARNING: possible loss of information initializing float expression to int array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
-                        elif arrlit_type == Type.STRING and (tyype == Type.INT or tyype == Type.FLOAT):
-                            self.add_to_messages(token.line, token.column, 
-                                                 f"ERROR: trying to initialize 'char *' expression to '{tyype}' array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
+            text = ctx.array(i).identifier().getText()
+            token = ctx.array(i).identifier().IDENTIFIER().getPayload()
+            tyype = ctx.tyype().getText()
+            if self.visit(ctx.array(i).expression()) == Type.INT:
+                self.ids_defined[text] = tyype, None
+            if ctx.array_literal(i) is not None:
+                for index in range(len(ctx.array_literal(i).expression())):
+                    arrlit_type = self.visit(ctx.array_literal(i).expression(index))
+                    if arrlit_type == Type.FLOAT and tyype == Type.INT:
+                        self.add_to_messages(token.line, token.column,
+                                             f"WARNING: possible loss of information initializing float expression to int array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
+                    elif arrlit_type == Type.STRING and (tyype == Type.INT or tyype == Type.FLOAT):
+                        self.add_to_messages(token.line, token.column,
+                                             f"ERROR: trying to initialize 'char *' expression to '{tyype}' array '{text}' at index {index} of array literal in line {token.line} and column {token.column}")
 
         return self.visitChildren(ctx)
 
@@ -211,7 +220,7 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 token = ctx.identifier().IDENTIFIER().getPayload()
                 text = ctx.identifier().getText()
                 id_type = self.ids_defined.get(text, Type.VOID)
-                if(expr_type == Type.STRING and (id_type == Type.INT or id_type == Type.FLOAT)):
+                if expr_type == Type.STRING and (id_type == Type.INT or id_type == Type.FLOAT):
                     self.add_to_messages(token.line, token.column,
                                          f"ERROR: trying to assign 'char *' expression to variable '{text}' in line {token.line} and column {token.column}")
 
@@ -221,11 +230,24 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 id_type = self.ids_defined.get(text, Type.VOID)
 
             if id_type == Type.INT and expr_type == Type.FLOAT:
+
                 self.add_to_messages(token.line, token.column,
                                      f"WARNING: possible loss of information assigning float "
                                      f"expression to int variable "
                                      f"'{text}' in line {token.line} and column {token.column}"
                                      )
+
+            elif ctx.OP.text in ['+=', '-=', '*=', '/=']:
+                token = ctx.identifier().IDENTIFIER().getPayload()
+                text = ctx.identifier().getText()
+                id_type = self.ids_defined.get(text, Type.VOID)
+                expression_type = self.visit(ctx.expression())
+                if expression_type == Type.FLOAT and id_type == Type.INT:
+                    self.add_to_messages(token.line, token.column,
+                                         f"WARNING: possible loss of information assigning float "
+                                         f"expression to int variable "
+                                         f"'{text}' in line {token.line} and column {token.column}"
+                                         )
 
             return self.visitChildren(ctx)
 
@@ -253,13 +275,15 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                 tyype = self.ids_defined.get(text, Type.VOID)
 
             elif ctx.array():
+                self.visit(ctx.array())
                 text = ctx.array().identifier().getText()
                 token = ctx.array().identifier().IDENTIFIER().getPayload()
                 tyype = self.ids_defined.get(text, Type.VOID)
                 if text in self.ids_defined.keys():
                     tyype = self.ids_defined[text][0]
                 else:
-                    self.add_to_messages(token.line, token.column, f"ERROR: undefined array '{text}' in line {token.line} and column {token.column}")
+                    self.add_to_messages(token.line, token.column,
+                                         f"ERROR: undefined array '{text}' in line {token.line} and column {token.column}")
 
             elif ctx.function_call():
                 function_type = self.visit(ctx.function_call())
@@ -281,11 +305,21 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
                                              f"ERROR: binary operator '{text}' used on type void "
                                              f"in line {token.line} and column {token.column}"
                                              )
-            tyype = right
+            # always returns float if exists
+            tyype = Type.FLOAT if Type.FLOAT in [left, right] else right
         return tyype
 
     # Visit a parse tree produced by GrammarParser#array.
     def visitArray(self, ctx: GrammarParser.ArrayContext):
+        expression_type = self.visit(ctx.expression())
+        token = ctx.identifier().IDENTIFIER().getPayload()
+        line = token.line
+        column = token.column
+        # print(expression_type, ctx.identifier().getText(), line, column)
+        if expression_type == Type.FLOAT:
+            self.add_to_messages(line, column, f"ERROR: array expression must be an integer, "
+                                     f"but it is float in line {line} and column {column}")
+
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by GrammarParser#array_literal.
@@ -320,7 +354,6 @@ class GrammarCheckerVisitor(ParseTreeVisitor):
         param_index = 0
         for defined_function_param, called_function_param in zip(defined_function_params, called_function_params):
             if called_function_param == Type.FLOAT and defined_function_param == Type.INT:
-
                 self.add_to_messages(token.line, token.column,
                                      f"WARNING: possible loss of information converting float expression to "
                                      f"int expression in parameter {param_index} of function '{function_name}' "
